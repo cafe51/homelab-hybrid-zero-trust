@@ -205,7 +205,7 @@ services:
       - PUID=${PUID:-1000}
       - PGID=${PGID:-1000}
       - TZ=${TZ:-America/Sao_Paulo}
-      - JELLYFIN_PublishedServerUrl=https://play.${DOMAIN_NAME:-japheflix.duckdns.org}
+      - JELLYFIN_PublishedServerUrl=https://play.${DOMAIN_NAME:-yourdomain.duckdns.org}
     volumes:
       - /home/ubuntu/configs/jellyfin:/config
       - /home/ubuntu/GoogleDrive:/home/ubuntu/GoogleDrive

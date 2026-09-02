@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Mini servidor HTTP para shutdown/status do PC."""
+import os
 import subprocess
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
-PORT = 9876
+PORT = int(os.getenv("PC_REMOTE_PORT", "9876"))
+LOG_FILE = os.path.expanduser('~/pc-remote.log')
 
 class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -22,13 +24,13 @@ class Handler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(b'{"action":"shutdown"}')
             subprocess.Popen(['systemctl', 'poweroff', '-i'],
-                             stdout=open('/home/japhe/pc-remote.log','a'), stderr=open('/home/japhe/pc-remote.log','a'))
+                             stdout=open(LOG_FILE, 'a'), stderr=open(LOG_FILE, 'a'))
         elif self.path == '/hibernate':
             self.send_response(200)
             self.end_headers()
             self.wfile.write(b'{"action":"hibernate"}')
             subprocess.Popen(['systemctl', 'hibernate', '-i'],
-                             stdout=open('/home/japhe/pc-remote.log','a'), stderr=open('/home/japhe/pc-remote.log','a'))
+                             stdout=open(LOG_FILE, 'a'), stderr=open(LOG_FILE, 'a'))
         else:
             self.send_response(404)
             self.end_headers()

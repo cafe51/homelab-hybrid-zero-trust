@@ -22,7 +22,16 @@ fi
 
 if ! pgrep -f "app.py" >/dev/null || ! pgrep -f "socks5.py" >/dev/null; then
     echo "[+] Iniciando Proxy Residencial e Telemetria..."
-    bash $HOME/.termux/boot/start-proxy
+    if [ -f "$HOME/start-proxy.sh" ]; then
+        bash "$HOME/start-proxy.sh"
+    elif [ -f "$HOME/.termux/boot/start-proxy" ]; then
+        bash "$HOME/.termux/boot/start-proxy"
+    elif [ -f "./start-proxy.sh" ]; then
+        bash "./start-proxy.sh"
+    else
+        python3 "$HOME/socks5.py" &
+        python3 "$HOME/app.py" &
+    fi
 fi
 
 if ! tmux has-session -t worker 2>/dev/null; then

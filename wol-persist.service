@@ -5,6 +5,7 @@ Before=shutdown.target
 
 [Service]
 Type=oneshot
+# Replace 'eno1' with your physical ethernet network interface (e.g., eth0, enp3s0)
 ExecStart=/usr/sbin/ethtool -s eno1 wol g
 TimeoutStartSec=5
 

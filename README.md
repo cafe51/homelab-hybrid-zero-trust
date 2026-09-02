@@ -205,6 +205,8 @@ Este projeto foi integralmente concebido e desenvolvido utilizando o fluxo de **
 ├── .env.example                    # Template de variáveis de ambiente para a stack
 ├── .gitignore                      # Proteção de segredos, configs locais e documentação interna
 ├── app.py                          # Dashboard web (Flask) e API de telemetria do Edge Worker
+├── socks5.py                       # Proxy Residencial SOCKS5 com SO_BINDTODEVICE (wlan0)
+├── start-proxy.sh                  # Inicializador dos daemons Root (Proxy SOCKS5, Dashboard e Sysfs)
 ├── queue_manager.py                # Cérebro de alocação de disco, semáforo e detecção de poisoned swarms
 ├── worker.sh                       # Sincronizador de magnets/sidecars e resolvedor de InfoHash
 ├── loop.sh                         # Loop infinito do orquestrador de borda (executado via tmux)

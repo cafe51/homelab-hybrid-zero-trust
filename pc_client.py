@@ -1,7 +1,7 @@
 import os
 import socket
 
-PC_IP = os.getenv('PC_IP', '192.168.0.11')
+PC_IP = os.getenv('PC_IP', '192.168.0.100')
 PC_PORT = int(os.getenv('PC_PORT', '9876'))
 IFACE = os.getenv('PC_IFACE', 'wlan0')
 SO_BINDTODEVICE = 25

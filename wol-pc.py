@@ -3,7 +3,7 @@
 import os
 import socket
 
-MAC = os.getenv('PC_MAC', '30:9c:23:a1:38:41')
+MAC = os.getenv('PC_MAC', '00:11:22:33:44:55')
 BROADCAST = os.getenv('PC_BROADCAST', '192.168.0.255')
 IFACE = os.getenv('PC_IFACE', 'wlan0')
 SO_BINDTODEVICE = 25

@@ -4,7 +4,7 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/python3 /home/japhe/pc-remote.py
+ExecStart=/usr/bin/python3 %h/pc-remote.py
 Restart=always
 RestartSec=5
 

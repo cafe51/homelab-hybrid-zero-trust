@@ -5,7 +5,7 @@ polkit.addRule(function(action, subject) {
          action.id == "org.freedesktop.login1.hibernate-ignore-inhibit" ||
          action.id == "org.freedesktop.login1.reboot" ||
          action.id == "org.freedesktop.login1.reboot-ignore-inhibit") &&
-        subject.user == "japhe") {
+        (subject.isInGroup("sudo") || subject.isInGroup("wheel") || subject.user == "YOUR_USERNAME")) {
         return polkit.Result.YES;
     }
 });
