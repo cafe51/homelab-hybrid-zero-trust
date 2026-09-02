@@ -1,0 +1,56 @@
+# ==============================================================================
+# Homelab Zero-Trust: Git Ignore
+# ==============================================================================
+
+# --- Secrets & Environment ---
+.env
+.env.local
+.env.*.local
+*.key
+*.pem
+*.crt
+*.id_rsa*
+.ssh/
+strikes.json
+
+# --- System & Local Directories ---
+.config/
+.local/
+.termux/
+backups/
+storage/
+mappings/
+
+# --- Internal Agent Documentation & Private Notes ---
+# (Mantidos no disco para sessões locais de IA/vibecoding, mas ignorados no Git)
+0*.md
+03_docker-compose_oracle_FINAL.yml
+IDEA.md
+todoHomelab.txt
+
+# --- Logs & Dynamic State ---
+*.log
+*.lock
+*.sock
+*.pid
+
+# --- Archives & Snapshots ---
+*.tar.gz
+*.tar
+*.zip
+*.gz
+*.7z
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+
+# --- OS & IDE Metadata ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

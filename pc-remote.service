@@ -1,0 +1,12 @@
+[Unit]
+Description=PC Remote Control Server
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /home/japhe/pc-remote.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

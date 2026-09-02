@@ -1,0 +1,12 @@
+[Unit]
+Description=Enable Wake-on-LAN before shutdown
+DefaultDependencies=no
+Before=shutdown.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/sbin/ethtool -s eno1 wol g
+TimeoutStartSec=5
+
+[Install]
+WantedBy=shutdown.target

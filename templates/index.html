@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Worker Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0f172a;
+            --glass-bg: rgba(30, 41, 59, 0.7);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent: #38bdf8;
+            --accent-glow: rgba(56, 189, 248, 0.5);
+            --success: #22c55e;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+        }
+        
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg);
+            background-image: radial-gradient(circle at top right, rgba(56, 189, 248, 0.15), transparent 40%),
+                              radial-gradient(circle at bottom left, rgba(139, 92, 246, 0.15), transparent 40%);
+            color: var(--text-main);
+            min-height: 100vh;
+            padding: 2rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .container {
+            max-width: 900px;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 1rem;
+        }
+        
+        header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            background: linear-gradient(to right, #38bdf8, #8b5cf6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 30px var(--accent-glow);
+        }
+
+        .glass-card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 1.5rem;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        .glass-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 15px 35px rgba(0,0,0,0.4);
+        }
+
+        .grid-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .stat-header {
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-muted);
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 600;
+        }
+
+        .stat-sub {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            margin-top: 0.25rem;
+        }
+
+        /* Progress Bar */
+        .progress-container {
+            width: 100%;
+            height: 8px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 4px;
+            margin-top: 0.75rem;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: var(--accent);
+            border-radius: 4px;
+            transition: width 0.5s ease;
+        }
+
+        /* Torrents List */
+        .torrent-item {
+            border-bottom: 1px solid var(--glass-border);
+            padding: 1rem 0;
+        }
+        
+        .torrent-item:last-child {
+            border-bottom: none;
+        }
+
+        .torrent-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .torrent-name {
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 70%;
+        }
+
+        .torrent-speed {
+            color: var(--accent);
+            font-weight: 600;
+        }
+
+        .torrent-details {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-top: 0.5rem;
+        }
+
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 0.6; }
+            50% { opacity: 1; }
+            100% { opacity: 0.6; }
+        }
+        
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        .status-dot.charging { background-color: var(--success); box-shadow: 0 0 10px var(--success); }
+        .status-dot.discharging { background-color: var(--warning); box-shadow: 0 0 10px var(--warning); }
+        .status-dot.idle { background-color: var(--accent); box-shadow: 0 0 10px var(--accent); }
+
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>Worker Station</h1>
+        <p style="color: var(--text-muted); margin-bottom: 0.5rem;">Termux Telemetry Dashboard</p>
+        <p style="color: var(--text-muted); font-size: 0.8rem; opacity: 0.7;" id="sys-info">
+            <span id="sys-cpu">CPU Load: --</span> &nbsp;|&nbsp; <span id="sys-ram">RAM: --%</span>
+        </p>
+    </header>
+
+    <div class="grid-stats">
+        <!-- Storage -->
+        <div class="glass-card">
+            <div class="stat-header">💾 Armazenamento</div>
+            <div class="stat-value" id="disk-val">-- GiB</div>
+            <div class="stat-sub">Espaço Disponível</div>
+        </div>
+
+        <!-- Battery -->
+        <div class="glass-card">
+            <div class="stat-header">🔋 Bateria</div>
+            <div class="stat-value" id="batt-val">-- %</div>
+            <div class="stat-sub">
+                <span id="batt-dot" class="status-dot"></span>
+                <span id="batt-status">Verificando...</span>
+            </div>
+            <div class="progress-container">
+                <div class="progress-bar" id="batt-bar" style="width: 0%; background: var(--success);"></div>
+            </div>
+        </div>
+
+        <!-- PC Control -->
+        <div class="glass-card" style="display: flex; flex-direction: column; align-items: center; gap: 0.75rem;">
+            <div class="stat-header">🖥️ PC Ubuntu</div>
+            <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 1rem;">
+                <span id="pc-dot" style="width: 10px; height: 10px; border-radius: 50%; display: inline-block; background: #666;"></span>
+                <span id="pc-state" style="color: var(--text-muted);">Verificando...</span>
+            </div>
+            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; justify-content: center;">
+                <button id="wake-btn" onclick="wakePC()" style="
+                    background: linear-gradient(135deg, #38bdf8, #8b5cf6);
+                    border: none; color: white; padding: 8px 18px; border-radius: 10px;
+                    font-size: 0.9rem; font-weight: 600; cursor: pointer;
+                    box-shadow: 0 0 15px rgba(56, 189, 248, 0.3);
+                ">⚡ Ligar</button>
+                <button id="poweroff-btn" onclick="shutdownPC()" style="
+                    background: rgba(239, 68, 68, 0.8);
+                    border: none; color: white; padding: 8px 18px; border-radius: 10px;
+                    font-size: 0.9rem; font-weight: 600; cursor: pointer;
+                ">⏻ Desligar</button>
+            </div>
+            <span id="pc-status-msg" style="font-size: 0.8rem; color: var(--text-muted); min-height: 1rem;"></span>
+        </div>
+
+    </div>
+
+    <!-- Rclone Uploads -->
+    <div class="glass-card">
+        <div class="stat-header" style="margin-bottom: 1rem; border-bottom: 1px solid var(--glass-border); padding-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center;">
+            <span>☁️ Uploads Rclone</span>
+            <span id="rclone-speed-total" style="color: #8b5cf6; font-weight: 600;">0 MB/s</span>
+        </div>
+        <div id="rclone-container">
+            <p style="color: var(--text-muted); text-align: center; padding: 1rem;">Nenhum upload ativo no momento.</p>
+        </div>
+    </div>
+
+    <!-- Torrents -->
+    <div class="glass-card">
+        <div class="stat-header" style="margin-bottom: 1rem; border-bottom: 1px solid var(--glass-border); padding-bottom: 0.5rem;">
+            🔄 Torrents Ativos
+        </div>
+        <div id="torrents-container">
+            <p style="color: var(--text-muted); text-align: center; padding: 1rem;">Nenhum torrent ativo no momento.</p>
+        </div>
+    </div>
+
+    <!-- Backup Logs -->
+    <div class="glass-card">
+        <div class="stat-header" style="margin-bottom: 1rem; border-bottom: 1px solid var(--glass-border); padding-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center;">
+            <span>🛡️ Logs de Backup & Snapshot</span>
+        </div>
+        <div id="backup-container" style="background: rgba(0,0,0,0.2); padding: 1rem; border-radius: 8px; font-family: monospace; font-size: 0.85rem; height: 180px; overflow-y: auto; color: var(--text-muted); display: flex; flex-direction: column; gap: 4px;">
+            <p>Carregando logs...</p>
+        </div>
+    </div>
+</div>
+
+<script>
+    async function fetchData() {
+        try {
+            const res = await fetch('/api/stats');
+            const data = await res.json();
+
+            // Update Storage
+            if(data.disk && !data.disk.error) {
+                document.getElementById('disk-val').innerText = `${data.disk.avail_gib} GiB`;
+            }
+
+            // Update Battery
+            if(data.battery) {
+                document.getElementById('batt-val').innerText = `${data.battery.level} %`;
+                document.getElementById('batt-bar').style.width = `${data.battery.level}%`;
+                
+                const statusStr = data.battery.status.toLowerCase();
+                document.getElementById('batt-status').innerText = data.battery.status;
+                const dot = document.getElementById('batt-dot');
+                dot.className = 'status-dot'; // reset
+                if (statusStr.includes('charging') && !statusStr.includes('not')) {
+                    dot.classList.add('charging', 'pulse');
+                } else if (statusStr.includes('discharging')) {
+                    dot.classList.add('discharging');
+                } else {
+                    dot.classList.add('idle');
+                }
+            }
+
+            // Update Rclone
+            if(data.rclone) {
+                const container = document.getElementById('rclone-container');
+                document.getElementById('rclone-speed-total').innerText = `${data.rclone.speed_mb} MB/s`;
+                
+                if(data.rclone.count > 0) {
+                    document.getElementById('rclone-speed-total').classList.add('pulse');
+                    let html = '';
+                    if(data.rclone.files && data.rclone.files.length > 0) {
+                        data.rclone.files.forEach(f => {
+                            html += `
+                            <div class="torrent-item">
+                                <div class="torrent-header">
+                                    <span class="torrent-name">${f.name}</span>
+                                    <span class="torrent-speed" style="color: #8b5cf6;">${f.speed_mb} MB/s</span>
+                                </div>
+                                <div class="progress-container" style="height: 4px;">
+                                    <div class="progress-bar" style="width: ${f.percent}%; background: #8b5cf6;"></div>
+                                </div>
+                                <div class="torrent-details">
+                                    <span>${f.percent}% enviado</span>
+                                </div>
+                            </div>
+                            `;
+                        });
+                    }
+                    container.innerHTML = html;
+                } else {
+                    document.getElementById('rclone-speed-total').classList.remove('pulse');
+                    container.innerHTML = `<p style="color: var(--text-muted); text-align: center; padding: 1rem;">Nenhum upload ativo no momento.</p>`;
+                }
+            }
+
+            // Update Torrents
+            if(data.transmission && data.transmission.torrents) {
+                const container = document.getElementById('torrents-container');
+                if (data.transmission.torrents.length === 0) {
+                    container.innerHTML = `<p style="color: var(--text-muted); text-align: center; padding: 1rem;">Nenhum torrent ativo no momento.</p>`;
+                } else {
+                    let html = '';
+                    data.transmission.torrents.forEach(t => {
+                        const statusColor = t.percentDone === 100 ? 'var(--success)' : 'var(--accent)';
+                        const isUploading = t.percentDone === 100 ? '(Aguardando Envio...)' : '';
+                        html += `
+                        <div class="torrent-item">
+                            <div class="torrent-header">
+                                <span class="torrent-name">${t.name}</span>
+                                <span class="torrent-speed">${t.rateDownload_mb} MB/s</span>
+                            </div>
+                            <div class="progress-container" style="height: 4px;">
+                                <div class="progress-bar" style="width: ${t.percentDone}%; background: ${statusColor};"></div>
+                            </div>
+                            <div class="torrent-details">
+                                <span>${t.percentDone}% concluído (${t.status_str})${t.is_poisoned ? ' <span style="color: #ff4444; font-weight: bold;">[POISONED]</span>' : ''}${t.strikes > 0 ? ' <span style="color: #f59e0b; font-weight: bold;">[🔥 STRIKE ' + t.strikes + '/3]</span>' : ''} ${isUploading} - ${t.size_str} (Restam ${t.eta_str})</span>
+                                <span>Peers: ${t.peersSendingToUs} baixando de ${t.peersConnected} conectados</span>
+                            </div>
+                        </div>
+                        `;
+                    });
+                    container.innerHTML = html;
+                }
+            }
+
+            // Update Sys
+            if(data.sys) {
+                document.getElementById('sys-cpu').innerText = `CPU: ${data.sys.cpu_percent}%`;
+                document.getElementById('sys-ram').innerText = `RAM: ${data.sys.ram_percent}% (${data.sys.ram_used} / ${data.sys.ram_total} MB)`;
+            }
+
+            // Update Backup Logs
+            if(data.backup && data.backup.lines) {
+                const container = document.getElementById('backup-container');
+                let html = '';
+                data.backup.lines.forEach(line => {
+                    let color = 'inherit';
+                    if(line.includes("ERRO")) color = 'var(--danger)';
+                    else if(line.includes("sucesso") || line.includes("Êxito")) color = 'var(--success)';
+                    else if(line.includes("===")) color = 'var(--accent)';
+                    
+                    html += `<div style="color: ${color};">${line}</div>`;
+                });
+                // Auto-scroll só se o conteudo mudou
+                if (container.innerHTML !== html) {
+                    container.innerHTML = html;
+                    container.scrollTop = container.scrollHeight;
+                }
+            }
+
+        } catch(e) {
+            console.error("Failed to fetch data", e);
+        }
+    }
+
+    // Polling every 2 seconds
+    setInterval(fetchData, 2000);
+    fetchData(); // initial call
+
+    // PC Control functions
+    const statusMsg = document.getElementById('pc-status-msg');
+
+    function showMsg(text, color) {
+        statusMsg.innerHTML = '<span style=\"color: ' + color + ';\">' + text + '</span>';
+        setTimeout(() => { statusMsg.innerText = ''; }, 4000);
+    }
+
+    async function wakePC() {
+        const btn = document.getElementById('wake-btn');
+        btn.disabled = true; btn.style.opacity = '0.6';
+        showMsg('Enviando magic packet...', 'var(--accent)');
+        try {
+            const res = await fetch('/api/wake-pc', { method: 'POST' });
+            const data = await res.json();
+            if (data.status === 'ok') {
+                showMsg('✅ Pacote enviado!', 'var(--success)');
+            } else {
+                showMsg('❌ ' + data.message, 'var(--danger)');
+            }
+        } catch(e) {
+            showMsg('❌ Erro de conexão', 'var(--danger)');
+        }
+        btn.disabled = false; btn.style.opacity = '1';
+    }
+
+    async function shutdownPC() {
+        if (!confirm('Desligar o PC?')) return;
+        showMsg('Enviando comando...', 'var(--warning)');
+        try {
+            const res = await fetch('/api/pc-shutdown', { method: 'POST' });
+            const data = await res.json();
+            if (data.status === 'ok') {
+                showMsg('✅ PC desligando!', 'var(--success)');
+            } else {
+                showMsg('❌ ' + data.message, 'var(--danger)');
+            }
+        } catch(e) {
+            showMsg('❌ Erro de conexão', 'var(--danger)');
+        }
+    }
+
+    async function hibernatePC() {
+        if (!confirm('Hibernar o PC?')) return;
+        showMsg('Enviando comando...', 'var(--warning)');
+        try {
+            const res = await fetch('/api/pc-hibernate', { method: 'POST' });
+            const data = await res.json();
+            if (data.status === 'ok') {
+                showMsg('✅ PC hibernando!', 'var(--success)');
+            } else {
+                showMsg('❌ ' + data.message, 'var(--danger)');
+            }
+        } catch(e) {
+            showMsg('❌ Erro de conexão', 'var(--danger)');
+        }
+    }
+
+    async function updatePCStatus() {
+        try {
+            const res = await fetch('/api/pc-status');
+            const data = await res.json();
+            const dot = document.getElementById('pc-dot');
+            const state = document.getElementById('pc-state');
+            if (data.pc_state === 'online') {
+                dot.style.background = 'var(--success)';
+                dot.style.boxShadow = '0 0 10px var(--success)';
+                state.innerText = 'Online';
+                state.style.color = 'var(--success)';
+            } else {
+                dot.style.background = '#666';
+                dot.style.boxShadow = 'none';
+                state.innerText = 'Offline';
+                state.style.color = 'var(--text-muted)';
+            }
+        } catch(e) {}
+    }
+
+    setInterval(updatePCStatus, 5000);
+    updatePCStatus();
+</script>
+
+</body>
+</html>

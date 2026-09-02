@@ -1,0 +1,273 @@
+version: '3.8'
+
+services:
+  jellyseerr:
+    image: fallenbagel/jellyseerr:latest
+    container_name: jellyseerr
+    environment:
+      - LOG_LEVEL=debug
+      - TZ=${TZ:-America/Sao_Paulo}
+      - HTTP_PROXY=http://gluetun-us:8888
+      - HTTPS_PROXY=http://gluetun-us:8888
+      - NO_PROXY=flaresolverr-us,flaresolverr-nl,flaresolverr-uk,localhost,127.0.0.1
+    ports:
+      - "127.0.0.1:5055:5055"
+    volumes:
+      - /home/ubuntu/configs/jellyseerr:/app/config
+    restart: unless-stopped
+
+  radarr:
+    image: lscr.io/linuxserver/radarr:latest
+    container_name: radarr
+    environment:
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
+      - TZ=${TZ:-America/Sao_Paulo}
+      - HTTP_PROXY=http://gluetun-us:8888
+      - HTTPS_PROXY=http://gluetun-us:8888
+      - NO_PROXY=flaresolverr-us,flaresolverr-nl,flaresolverr-uk,localhost,127.0.0.1
+    ports:
+      - "${TAILSCALE_ORACLE_IP:-100.100.100.100}:7878:7878"
+    volumes:
+      - /home/ubuntu/configs/radarr:/config
+      - /home/ubuntu/GoogleDrive:/home/ubuntu/GoogleDrive
+    restart: unless-stopped
+
+  sonarr:
+    image: lscr.io/linuxserver/sonarr:latest
+    container_name: sonarr
+    environment:
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
+      - TZ=${TZ:-America/Sao_Paulo}
+      - HTTP_PROXY=http://gluetun-us:8888
+      - HTTPS_PROXY=http://gluetun-us:8888
+      - NO_PROXY=flaresolverr-us,flaresolverr-nl,flaresolverr-uk,localhost,127.0.0.1
+    ports:
+      - "${TAILSCALE_ORACLE_IP:-100.100.100.100}:8989:8989"
+    volumes:
+      - /home/ubuntu/configs/sonarr:/config
+      - /home/ubuntu/GoogleDrive:/home/ubuntu/GoogleDrive
+    restart: unless-stopped
+
+  gluetun-us:
+    image: qmcgaw/gluetun
+    container_name: gluetun-us
+    cap_add:
+      - NET_ADMIN
+    environment:
+      - VPN_SERVICE_PROVIDER=${VPN_SERVICE_PROVIDER:-pia}
+      - VPN_TYPE=${VPN_TYPE:-openvpn}
+      - OPENVPN_USER=${OPENVPN_USER}
+      - OPENVPN_PASSWORD=${OPENVPN_PASSWORD}
+      - SERVER_REGIONS=US East
+      - HTTPPROXY=on
+    ports:
+      - "127.0.0.1:8888:8888/tcp"
+    restart: unless-stopped
+
+  gluetun-nl:
+    image: qmcgaw/gluetun
+    container_name: gluetun-nl
+    cap_add:
+      - NET_ADMIN
+    environment:
+      - VPN_SERVICE_PROVIDER=${VPN_SERVICE_PROVIDER:-pia}
+      - VPN_TYPE=${VPN_TYPE:-openvpn}
+      - OPENVPN_USER=${OPENVPN_USER}
+      - OPENVPN_PASSWORD=${OPENVPN_PASSWORD}
+      - SERVER_REGIONS=Netherlands
+      - HTTPPROXY=on
+    ports:
+      - "127.0.0.1:8889:8888/tcp"
+    restart: unless-stopped
+
+  gluetun-uk:
+    image: qmcgaw/gluetun
+    container_name: gluetun-uk
+    cap_add:
+      - NET_ADMIN
+    environment:
+      - VPN_SERVICE_PROVIDER=${VPN_SERVICE_PROVIDER:-pia}
+      - VPN_TYPE=${VPN_TYPE:-openvpn}
+      - OPENVPN_USER=${OPENVPN_USER}
+      - OPENVPN_PASSWORD=${OPENVPN_PASSWORD}
+      - SERVER_REGIONS=UK London
+      - HTTPPROXY=on
+    ports:
+      - "127.0.0.1:8890:8888/tcp"
+    restart: unless-stopped
+
+  flaresolverr-us:
+    image: ghcr.io/flaresolverr/flaresolverr:latest
+    container_name: flaresolverr-us
+    environment:
+      - LOG_LEVEL=info
+      - TZ=${TZ:-America/Sao_Paulo}
+      - HTTP_PROXY=http://gluetun-us:8888
+      - HTTPS_PROXY=http://gluetun-us:8888
+      - NO_PROXY=localhost,127.0.0.1
+    restart: unless-stopped
+
+  flaresolverr-nl:
+    image: ghcr.io/flaresolverr/flaresolverr:latest
+    container_name: flaresolverr-nl
+    environment:
+      - LOG_LEVEL=info
+      - TZ=${TZ:-America/Sao_Paulo}
+      - HTTP_PROXY=http://gluetun-nl:8888
+      - HTTPS_PROXY=http://gluetun-nl:8888
+      - NO_PROXY=localhost,127.0.0.1
+    restart: unless-stopped
+
+  flaresolverr-residencial:
+    image: ghcr.io/flaresolverr/flaresolverr:latest
+    container_name: flaresolverr-residencial
+    environment:
+      - LOG_LEVEL=info
+      - TZ=${TZ:-America/Sao_Paulo}
+      - PROXY=socks5://${TAILSCALE_WORKER_IP:-100.100.100.101}:1081
+      - NO_PROXY=localhost,127.0.0.1
+    restart: unless-stopped
+
+  flaresolverr-uk:
+    image: ghcr.io/flaresolverr/flaresolverr:latest
+    container_name: flaresolverr-uk
+    environment:
+      - LOG_LEVEL=info
+      - TZ=${TZ:-America/Sao_Paulo}
+      - HTTP_PROXY=http://gluetun-uk:8888
+      - HTTPS_PROXY=http://gluetun-uk:8888
+      - NO_PROXY=localhost,127.0.0.1
+    restart: unless-stopped
+
+  redis:
+    image: redis:alpine
+    container_name: redis
+    restart: unless-stopped
+
+  torrent-indexer:
+    image: felipemarinho97/torrent-indexer:latest
+    container_name: torrent-indexer
+    environment:
+      - FLARESOLVERR_ADDRESS=http://flaresolverr-residencial:8191
+      - REDIS_ADDR=redis:6379
+      - REDIS_URL=redis://redis:6379/0
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - TZ=${TZ:-America/Sao_Paulo}
+      - PROXY=socks5://${TAILSCALE_WORKER_IP:-100.100.100.101}:1081
+      - NO_PROXY=flaresolverr-residencial,flaresolverr-us,flaresolverr-nl,flaresolverr-uk,redis,localhost,127.0.0.1
+    restart: unless-stopped
+
+  prowlarr:
+    image: lscr.io/linuxserver/prowlarr:latest
+    container_name: prowlarr
+    environment:
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
+      - TZ=${TZ:-America/Sao_Paulo}
+    ports:
+      - "${TAILSCALE_ORACLE_IP:-100.100.100.100}:9696:9696"
+    volumes:
+      - /home/ubuntu/configs/prowlarr:/config
+    restart: unless-stopped
+
+  brazuca-proxy:
+    image: nginx:alpine
+    container_name: brazuca-proxy
+    network_mode: "container:gluetun-nl"
+    volumes:
+      - /home/ubuntu/configs/brazuca-proxy/nginx.conf:/etc/nginx/nginx.conf:ro
+    restart: unless-stopped
+
+  bazarr:
+    image: lscr.io/linuxserver/bazarr:latest
+    container_name: bazarr
+    environment:
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
+      - TZ=${TZ:-America/Sao_Paulo}
+      - HTTP_PROXY=http://gluetun-us:8888
+      - HTTPS_PROXY=http://gluetun-us:8888
+      - NO_PROXY=localhost,127.0.0.1,radarr,sonarr
+    ports:
+      - "${TAILSCALE_ORACLE_IP:-100.100.100.100}:6767:6767"
+    volumes:
+      - /home/ubuntu/configs/bazarr:/config
+      - /home/ubuntu/GoogleDrive:/home/ubuntu/GoogleDrive
+    restart: unless-stopped
+
+  jellyfin:
+    image: lscr.io/linuxserver/jellyfin:latest
+    container_name: jellyfin
+    environment:
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
+      - TZ=${TZ:-America/Sao_Paulo}
+      - JELLYFIN_PublishedServerUrl=https://play.${DOMAIN_NAME:-japheflix.duckdns.org}
+    volumes:
+      - /home/ubuntu/configs/jellyfin:/config
+      - /home/ubuntu/GoogleDrive:/home/ubuntu/GoogleDrive
+    ports:
+      - "127.0.0.1:8096:8096"
+      - "${TAILSCALE_ORACLE_IP:-100.100.100.100}:8096:8096"
+    restart: unless-stopped
+
+  npm:
+    image: jc21/nginx-proxy-manager:latest
+    container_name: npm
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "${TAILSCALE_ORACLE_IP:-100.100.100.100}:81:81"
+    volumes:
+      - /home/ubuntu/configs/npm/data:/data
+      - /home/ubuntu/configs/npm/letsencrypt:/etc/letsencrypt
+
+  duckdns:
+    image: lscr.io/linuxserver/duckdns:latest
+    container_name: duckdns
+    environment:
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
+      - TZ=${TZ:-America/Sao_Paulo}
+      - SUBDOMAINS=${DUCKDNS_SUBDOMAIN}
+      - TOKEN=${DUCKDNS_TOKEN}
+      - LOG_FILE=false
+    restart: unless-stopped
+
+  recyclarr:
+    image: ghcr.io/recyclarr/recyclarr:latest
+    container_name: recyclarr
+    user: "${PUID:-1000}:${PGID:-1000}"
+    environment:
+      - TZ=${TZ:-America/Sao_Paulo}
+      - HTTP_PROXY=http://gluetun-us:8888
+      - HTTPS_PROXY=http://gluetun-us:8888
+      - NO_PROXY=localhost,127.0.0.1,radarr,sonarr
+    volumes:
+      - /home/ubuntu/configs/recyclarr:/config
+    restart: unless-stopped
+
+  privoxy-residential:
+    image: gogost/gost:latest
+    container_name: privoxy-residential
+    command: -L http://:8118 -F socks5://${TAILSCALE_WORKER_IP:-100.100.100.101}:1081
+    restart: unless-stopped
+
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: open-webui
+    environment:
+      - OPENAI_API_BASE_URL=${OPENAI_API_BASE_URL:-https://integrate.api.nvidia.com/v1}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - HTTP_PROXY=http://privoxy-residential:8118
+      - HTTPS_PROXY=http://privoxy-residential:8118
+      - NO_PROXY=localhost,127.0.0.1
+    ports:
+      - "${TAILSCALE_ORACLE_IP:-100.100.100.100}:3000:8080"
+    volumes:
+      - /home/ubuntu/configs/open-webui:/app/backend/data
+    restart: unless-stopped
