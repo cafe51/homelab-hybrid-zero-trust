@@ -13,7 +13,7 @@
 
 ## ⚡ Resumo Executivo (TL;DR)
 
-O **Japheflix Homelab** é uma infraestrutura de automação de mídia e edge computing distribuída em **3 nós**, desenhada sob uma arquitetura **Zero Trust** e de consumo ultrabaixo de energia:
+O **Zero-Trust Hybrid Homelab** é uma infraestrutura de automação de mídia e edge computing distribuída em **3 nós**, desenhada sob uma arquitetura **Zero Trust** e de consumo ultrabaixo de energia:
 
 1. **☁️ Nuvem (Oracle Cloud VPS ARM 4C/24GB):** Orquestrador central rodando Docker Compose com túneis VPN multi-região, microsserviços de indexação (*arr stack), streaming (Jellyfin) e reverse proxy com SSL Let's Encrypt.
 2. **📱 Borda (Motorola E7+ Android / Termux Root):** Nó *headless* 24/7 responsável pelos downloads P2P pesados, gestão preditiva de espaço em disco, auto-cura de torrents corrompidos e atuando como um **Proxy Residencial SOCKS5** com chamadas de socket a nível de kernel (`SO_BINDTODEVICE`) para contornar bloqueios anti-bot do Cloudflare.
@@ -41,7 +41,7 @@ O **Japheflix Homelab** é uma infraestrutura de automação de mídia e edge co
 flowchart TB
     subgraph Userspace [" Camada de Consumo "]
         Client["🖥️ Clientes / Smart TVs / Mobile\n(Interface de Mídia)"]
-        Browser["🔒 Navegador Web\n(HTTPS japheflix.duckdns.org)"]
+        Browser["🔒 Navegador Web\n(HTTPS yourdomain.duckdns.org)"]
     end
 
     subgraph Cloud [" ☁️ Oracle Cloud VPS (ARM 4C / 24GB) "]
@@ -108,7 +108,7 @@ flowchart TB
 
 ### 1. 🛡️ Segurança Zero Trust & Isolamento de Portas
 - **Superfície de Ataque Mínima:** Nenhuma porta administrativa (7878, 8989, 9696, 6767, 3000) é exposta para a internet pública na VPS da Oracle.
-- **Isolamento de Redes:** Todas as ferramentas de gestão são vinculadas exclusivamente aos IPs virtuais `100.x.x.x` da malha privada **Tailscale**. Apenas as portas `80` e `443` estão abertas para o mundo, roteadas pelo **Nginx Proxy Manager** com certificados SSL automáticos Let's Encrypt para o domínio `japheflix.duckdns.org`.
+- **Isolamento de Redes:** Todas as ferramentas de gestão são vinculadas exclusivamente aos IPs virtuais `100.x.x.x` da malha privada **Tailscale**. Apenas as portas `80` e `443` estão abertas para o mundo, roteadas pelo **Nginx Proxy Manager** com certificados SSL automáticos Let's Encrypt para o domínio público configurado (ex: `yourdomain.duckdns.org`).
 
 ---
 
