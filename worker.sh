@@ -27,6 +27,9 @@ for f in "$DIR_STAGING"/*.magnet "$DIR_STAGING"/*.torrent; do
             if [ -f "${BASENAME}.tvdb.txt" ]; then
                 mv "${BASENAME}.tvdb.txt" "$DIR_MAPPINGS/$HASH.tvdb.txt"
             fi
+            if [ -f "${BASENAME}.title.txt" ]; then
+                mv "${BASENAME}.title.txt" "$DIR_MAPPINGS/$HASH.title.txt"
+            fi
         fi
         
         # Mover magnet final

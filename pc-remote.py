@@ -23,7 +23,7 @@ class Handler(BaseHTTPRequestHandler):
             self.send_response(200)
             self.end_headers()
             self.wfile.write(b'{"action":"shutdown"}')
-            subprocess.Popen(['systemctl', 'poweroff', '-i'],
+            subprocess.Popen(['sh', '-c', 'sync; systemctl poweroff -i'],
                              stdout=open(LOG_FILE, 'a'), stderr=open(LOG_FILE, 'a'))
         elif self.path == '/hibernate':
             self.send_response(200)

@@ -63,6 +63,16 @@ def get_disk_free_bytes():
         return avail_kb * 1024
     return 0
 
+def is_upload_running():
+    try:
+        res = subprocess.run(
+            ['flock', '-n', os.path.expanduser('~/upload.lock'), 'true'],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+        )
+        return res.returncode != 0
+    except Exception:
+        return False
+
 def get_transmission_session_id():
     req = urllib.request.Request(TRANSMISSION_RPC_URL)
     try:
@@ -159,7 +169,7 @@ def main():
         budget_bytes = 0
 
     data = call_transmission_rpc("torrent-get", {
-        "fields": ["id", "name", "hashString", "magnetLink", "status", "leftUntilDone", "rateDownload", "addedDate", "activityDate", "percentDone", "startDate", "downloadedEver", "haveValid"]
+        "fields": ["id", "name", "hashString", "magnetLink", "status", "leftUntilDone", "rateDownload", "addedDate", "activityDate", "percentDone", "startDate", "downloadedEver", "haveValid", "doneDate", "downloadDir"]
     })
     
     if not data or 'arguments' not in data or 'torrents' not in data['arguments']:
@@ -263,6 +273,29 @@ def main():
         if to_resume:
             print(f"Orçamento livre! Iniciando fila inteligente: {to_resume}")
             resume_torrents(to_resume)
+
+    # 5. WATCHDOG: RECOVERY DE TORRENTS CONCLUÍDOS NÃO ENVIADOS (STUCK/SEEDING)
+    completed_stuck = []
+    for t in torrents:
+        if t['leftUntilDone'] == 0 or t.get('percentDone', 0) >= 1.0:
+            done_date = t.get('doneDate', 0)
+            if done_date > 0 and (current_time - done_date) > 300:
+                completed_stuck.append(t)
+
+    if completed_stuck and not is_upload_running():
+        stuck = completed_stuck[0]
+        torrent_dir = stuck.get('downloadDir', os.path.expanduser('~/storage/downloads/Torrent/completo'))
+        torrent_name = stuck['name']
+        torrent_id = str(stuck['id'])
+        print(f"Watchdog: Torrent concluído sem upload detectado: {torrent_name} (ID: {torrent_id}). Acionando upload_gdrive.sh...")
+        env = os.environ.copy()
+        env['TR_TORRENT_DIR'] = torrent_dir
+        env['TR_TORRENT_NAME'] = torrent_name
+        env['TR_TORRENT_ID'] = torrent_id
+        env['TR_TORRENT_HASH'] = stuck.get('hashString', '')
+        upload_script = os.path.expanduser('~/upload_gdrive.sh')
+        if os.path.exists(upload_script):
+            subprocess.Popen(['bash', upload_script], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 if __name__ == "__main__":
     try:
