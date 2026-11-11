@@ -169,7 +169,7 @@ def main():
         budget_bytes = 0
 
     data = call_transmission_rpc("torrent-get", {
-        "fields": ["id", "name", "hashString", "magnetLink", "status", "leftUntilDone", "rateDownload", "addedDate", "activityDate", "percentDone", "startDate", "downloadedEver", "haveValid", "doneDate", "downloadDir"]
+        "fields": ["id", "name", "hashString", "magnetLink", "status", "leftUntilDone", "rateDownload", "addedDate", "activityDate", "percentDone", "startDate", "downloadedEver", "haveValid", "doneDate", "downloadDir", "files"]
     })
     
     if not data or 'arguments' not in data or 'torrents' not in data['arguments']:
@@ -184,6 +184,20 @@ def main():
     # Processamento e Filtragem
     for t in torrents:
         if t['leftUntilDone'] > 0:
+            # 0. DETECÇÃO DE TORRENT FRAUDULENTO / SEM VÍDEO (EX: .EXE)
+            files = t.get('files', [])
+            if files:
+                video_exts = ('.mkv', '.mp4', '.avi', '.ts', '.m4v', '.webm', '.mov')
+                archive_exts = ('.7z', '.rar', '.zip', '.tar', '.gz', '.bz2', '.xz', '.r00', '.r01')
+                has_video = any(f.get('name', '').lower().endswith(video_exts) for f in files)
+                has_archive = any(f.get('name', '').lower().endswith(archive_exts) for f in files)
+                
+                if not has_video and not has_archive:
+                    print(f"Torrent fraudulento/sem vídeo detectado antes do término: {t['name']}. Abortando e reportando falha...")
+                    report_failure_to_arr(t['name'], t['hashString'])
+                    call_transmission_rpc("torrent-remove", {"ids": [t['id']], "delete-local-data": True})
+                    continue
+
             downloaded_ever = t.get('downloadedEver', 0)
             have_valid = t.get('haveValid', 0)
             pct_raw = t.get('percentDone', 0)
@@ -298,6 +312,14 @@ def main():
             subprocess.Popen(['bash', upload_script], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 if __name__ == "__main__":
+    import sys
+    if len(sys.argv) > 2 and sys.argv[1] == "--report-fail":
+        h = sys.argv[2]
+        n = sys.argv[3] if len(sys.argv) > 3 else ""
+        print(f"Reportando falha para {n} ({h})...")
+        success = report_failure_to_arr(n, h)
+        sys.exit(0 if success else 1)
+
     try:
         main()
     except Exception as e:
