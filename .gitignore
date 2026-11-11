@@ -23,7 +23,6 @@ mappings/
 
 # --- Internal Agent Documentation & Private Notes ---
 # (Mantidos no disco para sessões locais de IA/vibecoding, mas ignorados no Git)
-0*.md
 03_docker-compose_oracle_FINAL.yml
 IDEA.md
 todoHomelab.txt
