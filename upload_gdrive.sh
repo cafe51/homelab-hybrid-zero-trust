@@ -77,6 +77,10 @@ fi
 # ==============================================================================
 # 2. VALIDAÇÃO DE VÍDEO LEGÍTIMO E ELIMINAÇÃO DE FALSOS / MALWARE
 # ==============================================================================
+# Ignorar/excluir arquivos de sample pequenos (< 150MB) que possam confundir a validação
+find "$CAMINHO_DO_ARQUIVO" -type f -iname "*sample*" -size -150M -delete 2>/dev/null
+
+# Procurar recursivamente por arquivos de vídeo válidos em qualquer nível de subpasta
 VIDEOS=$(find "$CAMINHO_DO_ARQUIVO" -type f \( -iname "*.mkv" -o -iname "*.mp4" -o -iname "*.avi" -o -iname "*.ts" -o -iname "*.m4v" -o -iname "*.webm" \) 2>/dev/null)
 
 if [ -z "$VIDEOS" ]; then
@@ -92,6 +96,12 @@ if [ -z "$VIDEOS" ]; then
     fi
     rm -rf "$CAMINHO_DO_ARQUIVO"
     exit 0
+fi
+
+# Se for uma pasta, trazer vídeos e legendas de subpastas aninhadas para a raiz
+if [ -d "$CAMINHO_DO_ARQUIVO" ]; then
+    find "$CAMINHO_DO_ARQUIVO" -mindepth 2 -type f \( -iname "*.mkv" -o -iname "*.mp4" -o -iname "*.avi" -o -iname "*.ts" -o -iname "*.m4v" -o -iname "*.webm" -o -iname "*.srt" -o -iname "*.sub" -o -iname "*.ass" \) -exec mv -n {} "$CAMINHO_DO_ARQUIVO/" \; 2>/dev/null
+    find "$CAMINHO_DO_ARQUIVO" -mindepth 1 -type d -empty -delete 2>/dev/null
 fi
 
 # Limpar arquivos executáveis maliciosos que possam ter vindo junto
