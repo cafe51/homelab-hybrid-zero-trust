@@ -137,12 +137,15 @@ flowchart TB
 - **Política de 3 Strikes & Auto-Cura:**
   - *Strikes 1 e 2:* O script purga os dados locais corrompidos, extrai o Magnet Link original via RPC e re-injeta o torrent para forçar uma nova seleção de peers saudáveis.
   - *Strike 3:* O script dispara uma requisição HTTP via proxy Tailscale para a API REST do Radarr/Sonarr, cruza o hash com o histórico (`eventType=grabbed`), marca o release como falho (`/api/v3/history/failed/{id}`), coloca o hash na blocklist e força a busca autônoma de um release alternativo.
+- **Watchdog de Conclusão e Resgate de Uploads:** Se um download é finalizado mas por qualquer motivo o hook do Transmission não disparar (ou falhar devido a instabilidade pontual de rede), o watchdog do script detecta torrents concluídos estagnados há mais de 5 minutos, valida se não há upload concorrente em andamento via semáforo `flock` (`upload.lock`) e redispara o `upload_gdrive.sh` passando o hash, garantindo zero downloads presos no celular.
 
 ---
 
 ### 5. 🎯 Engenharia de Pontuação de Qualidade & Idiomas (TRaSH Guides Híbrido)
 - **Quebra da "Ditadura do 4K":** No Radarr e Sonarr, as resoluções foram mescladas em um único grupo aceito. Isso impede que arquivos 4K gigantes vençam arquivos 1080p bem compactados por padrão.
 - **Desempate por Resolução:** Custom Format `Tiebreaker: Alta Resolução (1080p+)` valendo `+1` ponto (desempata apenas quando tamanho e idioma forem rigorosamente iguais).
+- **Exclusão de Estruturas de Disco Bruto (`DVD`, `DVD-R`, `BR-DISK`):** Formatos de imagem de disco e pastas fatiadas (`VIDEO_TS`/`.VOB` e `.m2ts`) foram desativados nos perfis de qualidade, restringindo o ecossistema a contêineres modernos de vídeo (`.mkv`, `.mp4`).
+- **Filtro Inteligente para Trackers Russos com Áudio Original:** Em vez de banir indexadores russos (que frequentemente possuem releases de altíssima qualidade com áudio original em inglês), o Custom Format `Russo Sem Áudio Original` (`-10000` pontos) analisa títulos com cirílico ou termos russos (`DVO`, `MVO`, `AVO`, `Dub`) e só os penaliza caso **não possuam** tags de áudio original (`Original Eng`, `+ Original`, etc.), permitindo que releases bilíngues de ponta sejam aproveitados.
 - **Matemática Superior de Tamanhos:**
   - *Perfil Pessoal:* Pontuações na casa dos milhares (`+5000` para ideal, `-5000` para pesados) para calibrar com o Recyclarr.
   - *Perfil Família:* Pontuações na casa das dezenas (`+40` a `+50` para ideais, `-500` para pesados).
@@ -164,18 +167,19 @@ flowchart TB
 
 ---
 
-### 7. 🔄 Pipeline de Rastreio com Sidecars (Blackhole TMDB Tracking)
-- **O Desafio:** Em setups de Blackhole via Google Drive, o Radarr/Sonarr apenas salva o `.magnet` e não recebe o InfoHash de volta imediatamente.
-- **A Solução:**
-  1. No *Grab*, scripts no Radarr/Sonarr geram arquivos sidecar com o ID do TMDB/TVDB (ex: `Filme.2025.tmdb.txt`).
-  2. O worker no Android intercepta o par de arquivos, calcula o **InfoHash Base32** diretamente do `.magnet` e renomeia o arquivo para `<HASH>.tmdb.txt` na pasta `mappings/`.
-  3. A API do dashboard Flask lê essa pasta e injeta `"tmdbId": "..."` no JSON de telemetria, permitindo que clientes e dashboards pareiem mídias com 100% de precisão.
+### 7. 🔄 Pipeline Bidirecional de Rastreio e Importação (Blackhole & Canonical Title Bridge)
+- **O Desafio:** Em setups desacoplados de Blackhole via Google Drive, o Radarr/Sonarr apenas salva o `.magnet` sem saber o InfoHash de imediato. Além disso, no retorno, arquivos internos com nomes em cirílico, sem ano ou fora do padrão de releases costumavam ser rejeitados pelo parser do Radarr com o erro `Unknown Movie`, ficando retidos indefinidamente na pasta `Downloads_Concluidos`.
+- **A Solução Completa (Ida e Volta):**
+  1. *No Grab (Ida):* Scripts no Radarr/Sonarr (`radarr_tmdb.sh` e `sonarr_ids.sh`) geram arquivos sidecar com o ID do TMDB/TVDB (`.tmdb.txt`) **e com o Título Canônico oficial formatado** (`.title.txt`, ex: `Captain Fantastic (2016)`).
+  2. *Na Borda (Processamento):* O `worker.sh` no Android intercepta o pacote, extrai o **InfoHash Base32** diretamente do `.magnet` e mapeia em `mappings/<HASH>.tmdb.txt` e `mappings/<HASH>.title.txt`.
+  3. *Telemetria:* A API do dashboard Flask lê `mappings/` e injeta `"tmdbId": "..."` no JSON de telemetria, permitindo pareamento imediato de posters no Fladder.
+  4. *Na Conclusão (Volta):* Ao terminar o download, o `upload_gdrive.sh` consulta o InfoHash na base local de `mappings/` e encapsula o upload na pasta canônica `Downloads_Concluidos/<Titulo_Canonico_Ano>/`. O Radarr/Sonarr lê o nome canônico da pasta, faz a correspondência automática instantânea e importa a mídia com 100% de sucesso, prevenindo retenções no Blackhole.
 
 ---
 
 ### 8. 💻 Automação e Controle Remoto do PC Local
-- **Wake-on-LAN via Socket Direto (`wol-pc.py`):** Envio de Magic Packet através da interface física `wlan0` no Android (usando `SO_BINDTODEVICE` para furar a VPN), ligando o computador desktop pela rede local.
-- **Mini Servidor HTTP no PC (`pc-remote.py`):** Servidor Python rodando como serviço de usuário systemd (porta 9876), expondo endpoints para `/status`, `/shutdown` e `/hibernate` integrados ao dashboard mobile.
+- **Wake-on-LAN com Redundância Multicast/Unicast (`wol-pc.py`):** Envio de Magic Packet através da interface física `wlan0` no Android (usando `SO_BINDTODEVICE` para furar a VPN). O script dispara em rajadas sequenciais para múltiplos alvos (`192.168.0.255`, `255.255.255.255` e IP direto do PC) nas portas 7 e 9, com leitura autônoma do `.env` e fallbacks sanitizados.
+- **Mini Servidor HTTP no PC com Flush Seguro (`pc-remote.py`):** Servidor Python rodando como serviço de usuário systemd (porta 9876), expondo endpoints para `/status`, `/shutdown` e `/hibernate` integrados ao dashboard mobile. No desligamento, executa `sync` preventivo antes de `systemctl poweroff -i` para garantir que buffers do sistema de arquivos sejam completamente descarregados.
 - **Discrição com GDM Blanking:** Configuração no display manager (`greeter.dconf-defaults`) para apagar os monitores na tela de login em 30 segundos durante inicializações remotas.
 
 ---
@@ -211,6 +215,8 @@ Este projeto foi integralmente concebido e desenvolvido utilizando o fluxo de **
 ├── worker.sh                       # Sincronizador de magnets/sidecars e resolvedor de InfoHash
 ├── loop.sh                         # Loop infinito do orquestrador de borda (executado via tmux)
 ├── upload_gdrive.sh                # Gatilho pós-download com lock sequencial (flock) e validação MD5
+├── radarr_tmdb.sh                  # Custom Script do Radarr para exportação de TMDB ID e título canônico
+├── sonarr_ids.sh                   # Custom Script do Sonarr para exportação de TVDB/TMDB IDs e título
 ├── start_servers.sh                # Inicializador de todos os daemons e serviços do Worker
 ├── backup_termux.sh                # Automação de snapshot semanal do sistema Android
 ├── backup_openwebui.sh             # Backup dedicado da base de dados do Open-WebUI
