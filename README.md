@@ -134,9 +134,10 @@ flowchart TB
 - **Gestão de Dívida Ativa:** Como o nó de borda conta com apenas 39GB de disco, o daemon Python calcula o espaço livre real (`df -k`) e cruza com o tamanho pendente de todos os downloads ativos (*dívida ativa*). Se a soma ultrapassar a margem de segurança de 4GB, os downloads excedentes sofrem pausa instantânea.
 - **Congelamento de Torrents Travados (*Stalled*):** Torrents sem atividade ou seeds há mais de 5 minutos são congelados temporariamente, devolvendo orçamento de disco para downloads saudáveis da fila.
 - **Detector de Poisoned Swarms (Redes Corrompidas):** O script analisa a proporção de dados brutos (`downloadedEver` vs `haveValid`). Se um download receber > 200MB de dados mas descartar 5x mais dados corrompidos do que os gravados no disco (com < 10% concluído), é classificado como *Poisoned Swarm* (ataques de poluição ou honeypots).
+- **Filtro Prévio de Torrents Sem Vídeo:** Assim que os metadados do torrent são lidos pelo Transmission (`files`), o script checa se o torrent contém ao menos um vídeo ou compactado. Torrents exclusivamente não-vídeo (ex: malwares `.exe`) são abortados na hora, reportados via API e removidos sem consumir dados ou espaço.
 - **Política de 3 Strikes & Auto-Cura:**
   - *Strikes 1 e 2:* O script purga os dados locais corrompidos, extrai o Magnet Link original via RPC e re-injeta o torrent para forçar uma nova seleção de peers saudáveis.
-  - *Strike 3:* O script dispara uma requisição HTTP via proxy Tailscale para a API REST do Radarr/Sonarr, cruza o hash com o histórico (`eventType=grabbed`), marca o release como falho (`/api/v3/history/failed/{id}`), coloca o hash na blocklist e força a busca autônoma de um release alternativo.
+  - *Strike 3 (ou Falha Crítica):* O script dispara uma requisição HTTP via proxy Tailscale para a API REST do Radarr/Sonarr, cruza o hash com o histórico (`eventType=grabbed`), marca o release como falho (`/api/v3/history/failed/{id}`), coloca o hash na blocklist e força a busca autônoma de um release alternativo (via `autoRedownloadFailed`). Também suporta acionamento direto via CLI (`--report-fail <HASH> <NOME>`).
 - **Watchdog de Conclusão e Resgate de Uploads:** Se um download é finalizado mas por qualquer motivo o hook do Transmission não disparar (ou falhar devido a instabilidade pontual de rede), o watchdog do script detecta torrents concluídos estagnados há mais de 5 minutos, valida se não há upload concorrente em andamento via semáforo `flock` (`upload.lock`) e redispara o `upload_gdrive.sh` passando o hash, garantindo zero downloads presos no celular.
 
 ---
@@ -163,6 +164,7 @@ flowchart TB
 - **Wrapper Anti-Zumbi do Transmission:** Script transparente em `/data/data/com.termux/files/usr/bin/transmission-daemon` que executa `kill -9` em instâncias órfãs na memória antes de iniciar novos daemons.
 - **Desempenho de Peers sem Sobrecarga de Roteador:** Limite de 1000 conexões globais no Transmission. Como todo o tráfego passa encapsulado pelo túnel criptografado `tun0` da VPN, o roteador residencial enxerga apenas 1 conexão contínua, sem estourar tabelas NAT.
 - **Uploads Sequenciais com `flock` & Validação MD5:** O script `upload_gdrive.sh` utiliza um lock de arquivo (`flock $HOME/upload.lock`) para enfileirar uploads pesados via Rclone multithread (`--transfers=4`). O arquivo local só é excluído após confirmação do **Checksum MD5** e tamanho exato junto à API do Google Drive.
+- **Descompactação Automática Recursiva e Sanitização (7-Zip):** Arquivos compactados (`.7z`, `.rar`, `.zip`, etc.) são extraídos localmente de forma silenciosa com `7z x -y -p-`. Os compactados de origem são excluídos para liberar espaço. Se houver pastas aninhadas, os vídeos e legendas são achatados (*flattened*) para a raiz do release, amostras (*samples* < 150MB) e arquivos maliciosos (`.exe`, etc.) são purgados. Se nenhum vídeo legítimo existir pós-extração, o upload é cancelado, os resíduos são deletados e a falha é reportada via API para o Sonarr/Radarr disparar um auto-redownload.
 - **Sala de Espera (Staging Area) & Bypass de Cache RAM:** O `worker.sh` injeta carimbos de data Unix Epoch nos nomes dos arquivos `.magnet`, permitindo que o Transmission baixe repetidamente mídias com o mesmo nome sem travas em seu cache de memória RAM.
 
 ---
@@ -211,10 +213,10 @@ Este projeto foi integralmente concebido e desenvolvido utilizando o fluxo de **
 ├── app.py                          # Dashboard web (Flask) e API de telemetria do Edge Worker
 ├── socks5.py                       # Proxy Residencial SOCKS5 com SO_BINDTODEVICE (wlan0)
 ├── start-proxy.sh                  # Inicializador dos daemons Root (Proxy SOCKS5, Dashboard e Sysfs)
-├── queue_manager.py                # Cérebro de alocação de disco, semáforo e detecção de poisoned swarms
+├── queue_manager.py                # Cérebro de alocação de disco, semáforo, detecção de poisoned swarms e filtro pré-download
 ├── worker.sh                       # Sincronizador de magnets/sidecars e resolvedor de InfoHash
 ├── loop.sh                         # Loop infinito do orquestrador de borda (executado via tmux)
-├── upload_gdrive.sh                # Gatilho pós-download com lock sequencial (flock) e validação MD5
+├── upload_gdrive.sh                # Gatilho pós-download com auto-extração (7z), validação de vídeo, lock (flock) e envio MD5
 ├── radarr_tmdb.sh                  # Custom Script do Radarr para exportação de TMDB ID e título canônico
 ├── sonarr_ids.sh                   # Custom Script do Sonarr para exportação de TVDB/TMDB IDs e título
 ├── start_servers.sh                # Inicializador de todos os daemons e serviços do Worker
